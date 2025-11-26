@@ -37,15 +37,15 @@ impl<'a> Pass<'a> {
     }
 }
 
-pub fn init<S: 'static>(widget: &mut impl for<'a> FnMut(Pass<'a>) -> PassReturn<S>) -> S {
+pub fn init<S: 'static, W: for<'a> FnMut(Pass<'a>) -> PassReturn<S> + ?Sized>(widget: &mut W) -> S {
     match widget(Pass(InnerPass::Init())).0 {
         InnerPassReturn::Init(state) => state,
         InnerPassReturn::Other(_) => unreachable!(),
     }
 }
 
-pub fn draw<S: 'static>(
-    widget: &mut impl for<'a> FnMut(Pass<'a>) -> PassReturn<S>,
+pub fn draw<S: 'static, W: for<'a> FnMut(Pass<'a>) -> PassReturn<S> + ?Sized>(
+    widget: &mut W,
     state: &mut S,
     area: Rect,
     buffer: &mut Buffer,
