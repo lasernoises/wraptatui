@@ -39,3 +39,22 @@ pub fn ratatui_widget<'a, W: ratatui::widgets::Widget>(
         },
     )
 }
+
+pub fn ratatui_stateful_widget<'a, W: ratatui::widgets::StatefulWidget>(
+    pass: Pass<'a>,
+    widget: W,
+    state: &mut W::State,
+) -> PassReturn<'a, ()> {
+    pass.apply(
+        (widget, state),
+        Widget {
+            init: |_: (W, &mut W::State)| (),
+            draw: |(widget, state): (W, &mut W::State),
+                   _: &mut (),
+                   area: Rect,
+                   buffer: &mut Buffer| {
+                widget.render(area, buffer, state);
+            },
+        },
+    )
+}
