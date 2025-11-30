@@ -44,6 +44,7 @@ impl<S: 'static, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>> ListContent fo
                 |(widget, state): (&mut F, &mut S), _: &mut (), area: Rect, buffer: &mut Buffer| {
                     draw(widget, state, area, buffer)
                 },
+                |_, _, _| false,
             )
         });
     }

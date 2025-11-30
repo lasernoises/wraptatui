@@ -30,6 +30,7 @@ pub fn list<'a, S: 'static>(
                 draw(widget, &mut (), area, buffer);
             });
         },
+        |_, _, _| false,
     )
 }
 

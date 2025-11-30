@@ -1,6 +1,4 @@
-use ratatui::{buffer::Buffer, layout::Rect};
-
-use crate::{Pass, PassReturn, draw, init};
+use crate::{Pass, PassReturn, draw, handle_key_event, init};
 
 pub fn state<'a, S: 'static, T: Default + 'static>(
     pass: Pass<'a>,
@@ -8,17 +6,17 @@ pub fn state<'a, S: 'static, T: Default + 'static>(
 ) -> PassReturn<'a, impl Sized + 'static + use<S, T>> {
     pass.apply(
         content,
-        |content: &mut dyn for<'b> FnMut(Pass<'b>, &mut T) -> PassReturn<'b, S>| {
+        |content| {
             let mut state: T = Default::default();
 
             let widget_state = init(&mut |pass| content(pass, &mut state));
             (state, widget_state)
         },
-        |content: &mut dyn for<'b> FnMut(Pass<'b>, &mut T) -> PassReturn<'b, S>,
-         (state, widget_state): &mut (T, S),
-         area: Rect,
-         buffer: &mut Buffer| {
+        |content, (state, widget_state), area, buffer| {
             draw(&mut |pass| content(pass, state), widget_state, area, buffer);
+        },
+        |content, (state, widget_state), event| {
+            handle_key_event(&mut |pass| content(pass, state), widget_state, event)
         },
     )
 }

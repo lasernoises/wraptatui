@@ -41,6 +41,7 @@ pub fn ratatui_widget<'a, W: ratatui::widgets::Widget>(
         |widget: W, _: &mut (), area: Rect, buffer: &mut Buffer| {
             widget.render(area, buffer);
         },
+        |_, _, _| false,
     )
 }
 
@@ -55,5 +56,6 @@ pub fn ratatui_stateful_widget<'a, W: ratatui::widgets::StatefulWidget>(
         |(widget, state): (W, &mut W::State), _: &mut (), area: Rect, buffer: &mut Buffer| {
             widget.render(area, buffer, state);
         },
+        |_, _, _| false,
     )
 }
