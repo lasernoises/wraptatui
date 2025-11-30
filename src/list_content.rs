@@ -1,9 +1,6 @@
-use ratatui::{
-    buffer::Buffer,
-    layout::{Constraint, Rect},
-};
+use ratatui::layout::Constraint;
 
-use crate::{Pass, PassReturn, draw, init};
+use crate::{Pass, PassReturn, draw, handle_key_event, init};
 
 pub trait ListContent {
     type State: 'static;
@@ -53,12 +50,9 @@ impl<S: 'static, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>> ListContent fo
             &mut |pass| {
                 pass.apply(
                     (&mut self.0, &mut *state),
-                    |_: (&mut F, &mut S)| (),
-                    |(widget, state): (&mut F, &mut S),
-                     _: &mut (),
-                     area: Rect,
-                     buffer: &mut Buffer| { draw(widget, state, area, buffer) },
-                    |_, _, _| false,
+                    |_| (),
+                    |(widget, state), _, area, buffer| draw(widget, state, area, buffer),
+                    |(widget, state), _, event| handle_key_event(widget, state, event),
                 )
             },
             self.2,

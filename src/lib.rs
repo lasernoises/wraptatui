@@ -17,14 +17,18 @@ pub fn run<S: 'static>(widget: &mut impl for<'a> FnMut(Pass<'a>) -> PassReturn<S
         terminal.draw(|frame| {
             draw(widget, &mut state, frame.area(), frame.buffer_mut());
         })?;
-        if matches!(
-            event::read()?,
+
+        let event = event::read()?;
+
+        match event {
             Event::Key(KeyEvent {
                 code: KeyCode::Char('q'),
                 ..
-            })
-        ) {
-            break;
+            }) => break,
+            Event::Key(event) => {
+                handle_key_event(widget, &mut state, event);
+            }
+            _ => {}
         }
     }
     ratatui::restore();
