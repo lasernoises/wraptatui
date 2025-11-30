@@ -1,10 +1,7 @@
-use ratatui::{
-    buffer::Buffer,
-    layout::{Direction, Layout, Rect},
-};
+use ratatui::layout::{Direction, Layout};
 
 use crate::{
-    Pass, PassReturn, draw,
+    Pass, PassReturn, draw, handle_key_event,
     list_content::{ConstraintsIter, ListContent},
 };
 
@@ -15,22 +12,29 @@ pub fn list<'a, S: 'static>(
 ) -> PassReturn<'a, impl Sized + 'static + use<S>> {
     pass.apply(
         content,
-        |content: &mut dyn ListContent<State = S>| content.init(),
-        |content: &mut dyn ListContent<State = S>,
-         state: &mut S,
-         area: Rect,
-         buffer: &mut Buffer| {
+        |content| content.init(),
+        |content, state, area, buffer| {
             let layout = Layout::new(direction, ConstraintsIter(content));
             let areas = layout.split(area);
             let mut areas = areas.iter();
 
-            content.all(state, &mut |widget| {
+            content.all(state, &mut |widget, _focused| {
                 let area = *areas.next().unwrap();
 
                 draw(widget, &mut (), area, buffer);
             });
         },
-        |_, _, _| false,
+        |content, state, event| {
+            let mut handled = false;
+
+            content.all(state, &mut |widget, focused| {
+                if focused {
+                    handled = handle_key_event(widget, &mut (), event);
+                }
+            });
+
+            handled
+        },
     )
 }
 

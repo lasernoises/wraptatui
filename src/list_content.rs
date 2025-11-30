@@ -15,11 +15,23 @@ pub trait ListContent {
     fn all(
         &mut self,
         state: &mut Self::State,
-        callback: &mut dyn FnMut(&mut dyn for<'a> FnMut(Pass<'a>) -> PassReturn<'a, ()>),
+        callback: &mut dyn FnMut(&mut dyn for<'a> FnMut(Pass<'a>) -> PassReturn<'a, ()>, bool),
     );
 }
 
-pub struct SingleWidget<F>(F, Option<Constraint>);
+pub struct SingleWidget<F>(F, Option<Constraint>, bool);
+
+impl<F> SingleWidget<F> {
+    pub fn focused(mut self) -> Self {
+        self.2 = true;
+        self
+    }
+
+    pub fn with_focus(mut self, focus: bool) -> Self {
+        self.2 = focus;
+        self
+    }
+}
 
 impl<S: 'static, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>> ListContent for SingleWidget<F> {
     type State = S;
@@ -35,18 +47,22 @@ impl<S: 'static, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>> ListContent fo
     fn all(
         &mut self,
         state: &mut Self::State,
-        callback: &mut dyn FnMut(&mut dyn for<'a> FnMut(Pass<'a>) -> PassReturn<'a, ()>),
+        callback: &mut dyn FnMut(&mut dyn for<'a> FnMut(Pass<'a>) -> PassReturn<'a, ()>, bool),
     ) {
-        callback(&mut |pass| {
-            pass.apply(
-                (&mut self.0, &mut *state),
-                |_: (&mut F, &mut S)| (),
-                |(widget, state): (&mut F, &mut S), _: &mut (), area: Rect, buffer: &mut Buffer| {
-                    draw(widget, state, area, buffer)
-                },
-                |_, _, _| false,
-            )
-        });
+        callback(
+            &mut |pass| {
+                pass.apply(
+                    (&mut self.0, &mut *state),
+                    |_: (&mut F, &mut S)| (),
+                    |(widget, state): (&mut F, &mut S),
+                     _: &mut (),
+                     area: Rect,
+                     buffer: &mut Buffer| { draw(widget, state, area, buffer) },
+                    |_, _, _| false,
+                )
+            },
+            self.2,
+        );
     }
 }
 
@@ -60,11 +76,11 @@ impl<'a, S: 'static> Iterator for ConstraintsIter<'a, S> {
     }
 }
 
-pub fn fill<S: 'static>(
+pub fn fill<S: 'static, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>>(
     fraction: u16,
-    widget: impl for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>,
-) -> impl ListContent {
-    SingleWidget(widget, Some(Constraint::Fill(fraction)))
+    widget: F,
+) -> SingleWidget<F> {
+    SingleWidget(widget, Some(Constraint::Fill(fraction)), false)
 }
 
 macro_rules! impl_for_tuples {
@@ -94,7 +110,7 @@ macro_rules! impl_for_tuples {
             fn all(
                 &mut self,
                 state: &mut Self::State,
-                callback: &mut dyn FnMut(&mut dyn for<'a> FnMut(Pass<'a>) -> PassReturn<'a, ()>),
+                callback: &mut dyn FnMut(&mut dyn for<'a> FnMut(Pass<'a>) -> PassReturn<'a, ()>, bool),
             ) {
                 $(
                     self.$field.all(&mut state.$field, callback);
