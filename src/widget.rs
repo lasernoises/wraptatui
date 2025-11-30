@@ -2,11 +2,6 @@ use std::{any::Any, cell::Cell, marker::PhantomData};
 
 use ratatui::{buffer::Buffer, layout::Rect};
 
-pub struct Widget<I, D> {
-    pub init: I,
-    pub draw: D,
-}
-
 enum InnerPass<'a> {
     Init(),
     Draw(&'a mut dyn Any, Rect, &'a mut Buffer),
@@ -25,12 +20,13 @@ impl<'a> Pass<'a> {
     pub fn apply<B, S: 'static>(
         self,
         borrowed: B,
-        widget: Widget<impl Fn(B) -> S, impl Fn(B, &mut S, Rect, &mut Buffer)>,
+        init: impl Fn(B) -> S,
+        draw: impl Fn(B, &mut S, Rect, &mut Buffer),
     ) -> PassReturn<'a, S> {
         PassReturn(match self.0 {
-            InnerPass::Init() => InnerPassReturn::Init((widget.init)(borrowed)),
+            InnerPass::Init() => InnerPassReturn::Init(init(borrowed)),
             InnerPass::Draw(state, area, buffer) => {
-                (widget.draw)(borrowed, state.downcast_mut().unwrap(), area, buffer);
+                draw(borrowed, state.downcast_mut().unwrap(), area, buffer);
                 InnerPassReturn::Other(PhantomData)
             }
         })
