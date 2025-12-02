@@ -18,11 +18,19 @@ pub fn list<'a, S: 'static>(
             let areas = layout.split(area);
             let mut areas = areas.iter();
 
-            content.all(state, &mut |widget, _focused| {
+            let mut position = None;
+
+            content.all(state, &mut |widget, focused| {
                 let area = *areas.next().unwrap();
 
-                draw(widget, &mut (), area, buffer);
+                if let Some(widget_position) = draw(widget, &mut (), area, buffer)
+                    && focused
+                {
+                    position = Some(widget_position);
+                }
             });
+
+            position
         },
         |content, state, event| {
             let mut handled = false;

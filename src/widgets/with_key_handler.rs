@@ -14,7 +14,7 @@ pub fn with_key_handler<'a, S: 'static, T>(
         (shared, handler, content),
         |(shared, _, mut content)| State(init(&mut |p| content(p, shared))),
         |(shared, _, mut content), State(state), area, buffer| {
-            draw(&mut |p| content(p, shared), state, area, buffer);
+            draw(&mut |p| content(p, shared), state, area, buffer)
         },
         |(shared, mut handler, mut content), State(state), event| {
             handle_key_event(&mut |p| content(p, shared), state, event) || handler(shared, event)

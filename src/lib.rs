@@ -15,7 +15,11 @@ pub fn run<S: 'static>(widget: &mut impl for<'a> FnMut(Pass<'a>) -> PassReturn<S
     let mut terminal = ratatui::init();
     loop {
         terminal.draw(|frame| {
-            draw(widget, &mut state, frame.area(), frame.buffer_mut());
+            let cursor_position = draw(widget, &mut state, frame.area(), frame.buffer_mut());
+
+            if let Some(position) = cursor_position {
+                frame.set_cursor_position(position);
+            }
         })?;
 
         let event = event::read()?;
@@ -41,6 +45,7 @@ pub fn ratatui_widget<'a, W: ratatui::widgets::Widget>(
         |_: W| (),
         |widget: W, _: &mut (), area: Rect, buffer: &mut Buffer| {
             widget.render(area, buffer);
+            None
         },
         |_, _, _| false,
     )
@@ -56,6 +61,7 @@ pub fn ratatui_stateful_widget<'a, W: ratatui::widgets::StatefulWidget>(
         |_: (W, &mut W::State)| (),
         |(widget, state): (W, &mut W::State), _: &mut (), area: Rect, buffer: &mut Buffer| {
             widget.render(area, buffer, state);
+            None
         },
         |_, _, _| false,
     )

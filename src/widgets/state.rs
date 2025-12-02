@@ -13,7 +13,7 @@ pub fn state<'a, S: 'static, T: Default + 'static>(
             (state, widget_state)
         },
         |content, (state, widget_state), area, buffer| {
-            draw(&mut |pass| content(pass, state), widget_state, area, buffer);
+            draw(&mut |pass| content(pass, state), widget_state, area, buffer)
         },
         |content, (state, widget_state), event| {
             handle_key_event(&mut |pass| content(pass, state), widget_state, event)

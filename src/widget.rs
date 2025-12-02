@@ -1,11 +1,19 @@
 use std::{any::Any, cell::Cell, marker::PhantomData};
 
 use crossterm::event::KeyEvent;
-use ratatui::{buffer::Buffer, layout::Rect};
+use ratatui::{
+    buffer::Buffer,
+    layout::{Position, Rect},
+};
 
 enum InnerPass<'a> {
     Init(),
-    Draw(&'a mut dyn Any, Rect, &'a mut Buffer),
+    Draw(
+        &'a mut dyn Any,
+        Rect,
+        &'a mut Buffer,
+        &'a mut Option<Position>,
+    ),
     HandleKeyEvent(&'a mut dyn Any, KeyEvent, &'a mut bool),
 }
 
@@ -23,13 +31,13 @@ impl<'a> Pass<'a> {
         self,
         borrowed: B,
         init: impl Fn(B) -> S,
-        draw: impl Fn(B, &mut S, Rect, &mut Buffer),
+        draw: impl Fn(B, &mut S, Rect, &mut Buffer) -> Option<Position>,
         handle_key_event: impl Fn(B, &mut S, KeyEvent) -> bool,
     ) -> PassReturn<'a, S> {
         PassReturn(match self.0 {
             InnerPass::Init() => InnerPassReturn::Init(init(borrowed)),
-            InnerPass::Draw(state, area, buffer) => {
-                draw(borrowed, state.downcast_mut().unwrap(), area, buffer);
+            InnerPass::Draw(state, area, buffer, position) => {
+                *position = draw(borrowed, state.downcast_mut().unwrap(), area, buffer);
                 InnerPassReturn::Other(PhantomData)
             }
             InnerPass::HandleKeyEvent(state, event, handled) => {
@@ -52,10 +60,12 @@ pub fn draw<S: 'static, W: for<'a> FnMut(Pass<'a>) -> PassReturn<S> + ?Sized>(
     state: &mut S,
     area: Rect,
     buffer: &mut Buffer,
-) {
-    match widget(Pass(InnerPass::Draw(state, area, buffer))).0 {
+) -> Option<Position> {
+    let mut position = None;
+
+    match widget(Pass(InnerPass::Draw(state, area, buffer, &mut position))).0 {
         InnerPassReturn::Init(_) => unreachable!(),
-        InnerPassReturn::Other(_) => (),
+        InnerPassReturn::Other(_) => position,
     }
 }
 
