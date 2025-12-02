@@ -3,7 +3,7 @@ pub mod widget;
 pub mod widgets;
 
 use color_eyre::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEvent};
+use crossterm::event::{self, Event, KeyCode};
 use ratatui::{buffer::Buffer, layout::Rect};
 
 pub use widget::*;
@@ -20,15 +20,12 @@ pub fn run<S: 'static>(widget: &mut impl for<'a> FnMut(Pass<'a>) -> PassReturn<S
 
         let event = event::read()?;
 
-        match event {
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('q'),
-                ..
-            }) => break,
-            Event::Key(event) => {
-                handle_key_event(widget, &mut state, event);
+        if let Event::Key(event) = event {
+            let handled = handle_key_event(widget, &mut state, event);
+
+            if !handled && event.code == KeyCode::Char('q') {
+                break;
             }
-            _ => {}
         }
     }
     ratatui::restore();

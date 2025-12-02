@@ -16,13 +16,16 @@ fn main() {
                         with_key_handler(
                             p,
                             count,
-                            |count, event| {
-                                match event.code {
-                                    KeyCode::Up => *count += 1,
-                                    KeyCode::Down => *count -= 1,
-                                    _ => {}
+                            |count, event| match event.code {
+                                KeyCode::Up => {
+                                    *count += 1;
+                                    true
                                 }
-                                true
+                                KeyCode::Down => {
+                                    *count -= 1;
+                                    true
+                                }
+                                _ => false,
                             },
                             |p, count| ratatui_widget(p, count.to_string()),
                         )
