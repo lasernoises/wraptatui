@@ -3,9 +3,11 @@ use ratatui::{
     layout::Position,
     widgets::{Paragraph, Widget},
 };
-use tui_input::{Input, backend::crossterm::EventHandler};
+use tui_input::backend::crossterm::EventHandler;
 
 use crate::{Pass, PassReturn};
+
+pub use tui_input::Input;
 
 enum Mode {
     Normal,
