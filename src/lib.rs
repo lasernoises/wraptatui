@@ -46,6 +46,7 @@ pub fn run<S: 'static>(widget: &mut impl for<'a> FnMut(Pass<'a>) -> PassReturn<S
 
 pub fn ratatui_widget<'a, W: ratatui::widgets::Widget>(
     pass: Pass<'a>,
+    focusable: bool,
     widget: W,
 ) -> PassReturn<'a, ()> {
     pass.apply(
@@ -55,14 +56,16 @@ pub fn ratatui_widget<'a, W: ratatui::widgets::Widget>(
             widget.render(area, buffer);
             None
         },
+        |_, _| focusable,
         |_, _, _| false,
     )
 }
 
 pub fn ratatui_stateful_widget<'a, W: ratatui::widgets::StatefulWidget>(
     pass: Pass<'a>,
-    widget: W,
+    focusable: bool,
     state: &mut W::State,
+    widget: W,
 ) -> PassReturn<'a, ()> {
     pass.apply(
         (widget, state),
@@ -75,6 +78,7 @@ pub fn ratatui_stateful_widget<'a, W: ratatui::widgets::StatefulWidget>(
             widget.render(area, buffer, state);
             None
         },
+        |_, _| focusable,
         |_, _, _| false,
     )
 }

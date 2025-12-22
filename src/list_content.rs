@@ -1,6 +1,6 @@
 use ratatui::layout::Constraint;
 
-use crate::{Pass, PassReturn, draw, handle_key_event, init};
+use crate::{Pass, PassReturn, draw, focusable, handle_key_event, init};
 
 pub trait ListContent {
     type State: 'static;
@@ -64,6 +64,7 @@ impl<S: 'static, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>> ListContent fo
                     |(widget, state), _, focus, area, buffer| {
                         draw(widget, state, focus, area, buffer)
                     },
+                    |(widget, state), _| focusable(widget, state),
                     |(widget, state), _, event| handle_key_event(widget, state, event),
                 )
             },
@@ -125,6 +126,7 @@ impl<'a, T, S: 'static, W: for<'b> FnMut(Pass<'b>, &'a T) -> PassReturn<'b, S>> 
                         |(widget, state), _, focus, area, buffer| {
                             draw(&mut |p| widget(p, item), state, focus, area, buffer)
                         },
+                        |(widget, state), _| focusable(&mut |p| widget(p, item), state),
                         |(widget, state), _, event| {
                             handle_key_event(&mut |p| widget(p, item), state, event)
                         },

@@ -1,4 +1,4 @@
-use crate::{Pass, PassReturn, draw, handle_key_event, init};
+use crate::{Pass, PassReturn, draw, focusable, handle_key_event, init};
 
 pub fn state<'a, S: 'static, T: Default + 'static>(
     pass: Pass<'a>,
@@ -21,6 +21,7 @@ pub fn state<'a, S: 'static, T: Default + 'static>(
                 buffer,
             )
         },
+        |content, (state, widget_state)| focusable(&mut |pass| content(pass, state), widget_state),
         |content, (state, widget_state), event| {
             handle_key_event(&mut |pass| content(pass, state), widget_state, event)
         },

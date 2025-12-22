@@ -1,7 +1,7 @@
 use ratatui::layout::{Direction, Layout};
 
 use crate::{
-    Pass, PassReturn, draw, handle_key_event,
+    Pass, PassReturn, draw, focusable, handle_key_event,
     list_content::{ConstraintsIter, ListContent},
 };
 
@@ -31,6 +31,20 @@ pub fn list<'a, S: 'static>(
             });
 
             position
+        },
+        |content, state| {
+            let mut result = false;
+
+            content.all(state, &mut |widget, focused| {
+                // TODO: Add short circuiting in list content.
+                if result {
+                    return;
+                }
+
+                result = focusable(widget, &mut ());
+            });
+
+            result
         },
         |content, state, event| {
             let mut handled = false;

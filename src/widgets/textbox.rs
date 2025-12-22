@@ -25,6 +25,7 @@ pub fn textbox<'a>(
 
             Some(Position::new(area.x + x as u16, area.y))
         },
+        |_, _| true,
         |input, _, event| {
             input
                 .handle_event(&crossterm::event::Event::Key(event))
