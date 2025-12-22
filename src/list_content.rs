@@ -16,6 +16,16 @@ pub trait ListContent {
     );
 }
 
+pub struct ConstraintsIter<'a, S>(pub &'a mut dyn ListContent<State = S>);
+
+impl<'a, S: 'static> Iterator for ConstraintsIter<'a, S> {
+    type Item = Constraint;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next_constraint()
+    }
+}
+
 pub struct SingleWidget<F>(F, Option<Constraint>, bool);
 
 impl<F> SingleWidget<F> {
@@ -60,21 +70,83 @@ impl<S: 'static, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>> ListContent fo
     }
 }
 
-pub struct ConstraintsIter<'a, S>(pub &'a mut dyn ListContent<State = S>);
-
-impl<'a, S: 'static> Iterator for ConstraintsIter<'a, S> {
-    type Item = Constraint;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next_constraint()
-    }
-}
-
 pub fn fill<S: 'static, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>>(
     fraction: u16,
     widget: F,
 ) -> SingleWidget<F> {
     SingleWidget(widget, Some(Constraint::Fill(fraction)), false)
+}
+
+pub struct SliceListContent<'a, T, W> {
+    constraint: Constraint,
+    slice: &'a [T],
+    widget: W,
+    current: usize,
+}
+
+impl<'a, T, S: 'static, W: for<'b> FnMut(Pass<'b>, &'a T) -> PassReturn<'b, S>> ListContent
+    for SliceListContent<'a, T, W>
+{
+    type State = Vec<S>;
+
+    fn init(&mut self) -> Self::State {
+        Vec::new()
+    }
+
+    fn next_constraint(&mut self) -> Option<Constraint> {
+        self.current += 1;
+
+        if self.current <= self.slice.len() {
+            Some(self.constraint)
+        } else {
+            None
+        }
+    }
+
+    fn all(
+        &mut self,
+        state: &mut Self::State,
+        callback: &mut dyn FnMut(&mut dyn for<'b> FnMut(Pass<'b>) -> PassReturn<'b, ()>, bool),
+    ) {
+        for (i, item) in self.slice.iter().enumerate() {
+            if state.len() <= i {
+                state.push(init(&mut |p| (self.widget)(p, item)));
+            }
+
+            let state = &mut state[i];
+
+            callback(
+                &mut |pass| {
+                    pass.apply(
+                        (&mut self.widget, &mut *state),
+                        |_| (),
+                        |(widget, state), _, area, buffer| {
+                            draw(&mut |p| widget(p, item), state, area, buffer)
+                        },
+                        |(widget, state), _, event| {
+                            handle_key_event(&mut |p| widget(p, item), state, event)
+                        },
+                    )
+                },
+                false,
+            );
+        }
+
+        state.truncate(self.slice.len());
+    }
+}
+
+pub fn slice<'a, T, S: 'static, W: for<'b> FnMut(Pass<'b>, &'a T) -> PassReturn<'b, S>>(
+    constraint: Constraint,
+    slice: &'a [T],
+    widget: W,
+) -> SliceListContent<'a, T, W> {
+    SliceListContent {
+        constraint,
+        slice,
+        widget,
+        current: 0,
+    }
 }
 
 macro_rules! impl_for_tuples {
