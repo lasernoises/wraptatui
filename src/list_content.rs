@@ -1,9 +1,23 @@
 use ratatui::layout::Constraint;
 
-use crate::{Pass, PassReturn, draw, focusable, handle_key_event, init};
+use crate::{Focus, Focusable, Pass, PassReturn, WidgetState, draw, handle_key_event, init};
+
+pub trait ListContentState: 'static {
+    fn reset_focus(&mut self) -> Focusable;
+}
+
+pub struct DummyWidgetState;
+
+impl WidgetState for DummyWidgetState {
+    fn reset_focus(&mut self) -> Focusable {
+        // Using widgets and widget state here is mostly a somewhat hacky convenience thing.
+        // Resetting focus on list content does not go through this function.
+        unreachable!()
+    }
+}
 
 pub trait ListContent {
-    type State: 'static;
+    type State: ListContentState;
 
     fn init(&mut self) -> Self::State;
 
@@ -12,13 +26,16 @@ pub trait ListContent {
     fn all(
         &mut self,
         state: &mut Self::State,
-        callback: &mut dyn FnMut(&mut dyn for<'a> FnMut(Pass<'a>) -> PassReturn<'a, ()>, bool),
+        callback: &mut dyn FnMut(
+            &mut dyn for<'a> FnMut(Pass<'a>) -> PassReturn<'a, DummyWidgetState>,
+            Focus,
+        ),
     );
 }
 
 pub struct ConstraintsIter<'a, S>(pub &'a mut dyn ListContent<State = S>);
 
-impl<'a, S: 'static> Iterator for ConstraintsIter<'a, S> {
+impl<'a, S: ListContentState> Iterator for ConstraintsIter<'a, S> {
     type Item = Constraint;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -26,25 +43,23 @@ impl<'a, S: 'static> Iterator for ConstraintsIter<'a, S> {
     }
 }
 
-pub struct SingleWidget<F>(F, Option<Constraint>, bool);
+pub struct SingleWidget<F>(F, Option<Constraint>);
 
-impl<F> SingleWidget<F> {
-    pub fn focused(mut self) -> Self {
-        self.2 = true;
-        self
-    }
+pub struct SingleWidgetState<S>(S);
 
-    pub fn with_focus(mut self, focus: bool) -> Self {
-        self.2 = focus;
-        self
+impl<S: WidgetState> ListContentState for SingleWidgetState<S> {
+    fn reset_focus(&mut self) -> Focusable {
+        self.0.reset_focus()
     }
 }
 
-impl<S: 'static, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>> ListContent for SingleWidget<F> {
-    type State = S;
+impl<S: WidgetState, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>> ListContent
+    for SingleWidget<F>
+{
+    type State = SingleWidgetState<S>;
 
     fn init(&mut self) -> Self::State {
-        init(&mut self.0)
+        SingleWidgetState(init(&mut self.0))
     }
 
     fn next_constraint(&mut self) -> Option<Constraint> {
@@ -54,30 +69,32 @@ impl<S: 'static, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>> ListContent fo
     fn all(
         &mut self,
         state: &mut Self::State,
-        callback: &mut dyn FnMut(&mut dyn for<'a> FnMut(Pass<'a>) -> PassReturn<'a, ()>, bool),
+        callback: &mut dyn FnMut(
+            &mut dyn for<'a> FnMut(Pass<'a>) -> PassReturn<'a, DummyWidgetState>,
+            Focus,
+        ),
     ) {
         callback(
             &mut |pass| {
                 pass.apply(
                     (&mut self.0, &mut *state),
-                    |_| (),
+                    |_| DummyWidgetState,
                     |(widget, state), _, focus, area, buffer| {
-                        draw(widget, state, focus, area, buffer)
+                        draw(widget, &mut state.0, focus, area, buffer)
                     },
-                    |(widget, state), _| focusable(widget, state),
-                    |(widget, state), _, event| handle_key_event(widget, state, event),
+                    |(widget, state), _, event| handle_key_event(widget, &mut state.0, event),
                 )
             },
-            self.2,
+            Focus::Focused,
         );
     }
 }
 
-pub fn fill<S: 'static, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>>(
+pub fn fill<S: WidgetState, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>>(
     fraction: u16,
     widget: F,
 ) -> SingleWidget<F> {
-    SingleWidget(widget, Some(Constraint::Fill(fraction)), false)
+    SingleWidget(widget, Some(Constraint::Fill(fraction)))
 }
 
 pub struct SliceListContent<'a, T, W> {
@@ -87,13 +104,35 @@ pub struct SliceListContent<'a, T, W> {
     current: usize,
 }
 
-impl<'a, T, S: 'static, W: for<'b> FnMut(Pass<'b>, &'a T) -> PassReturn<'b, S>> ListContent
+pub struct SliceListContentState<S> {
+    inner_states: Vec<S>,
+    focus: usize,
+}
+
+impl<S: WidgetState> ListContentState for SliceListContentState<S> {
+    fn reset_focus(&mut self) -> Focusable {
+        for (i, state) in self.inner_states.iter_mut().enumerate() {
+            if state.reset_focus() == Focusable::Yes {
+                self.focus = i;
+
+                return Focusable::Yes;
+            }
+        }
+
+        return Focusable::No;
+    }
+}
+
+impl<'a, T, S: WidgetState, W: for<'b> FnMut(Pass<'b>, &'a T) -> PassReturn<'b, S>> ListContent
     for SliceListContent<'a, T, W>
 {
-    type State = Vec<S>;
+    type State = SliceListContentState<S>;
 
     fn init(&mut self) -> Self::State {
-        Vec::new()
+        SliceListContentState {
+            inner_states: Vec::new(),
+            focus: 0,
+        }
     }
 
     fn next_constraint(&mut self) -> Option<Constraint> {
@@ -109,34 +148,42 @@ impl<'a, T, S: 'static, W: for<'b> FnMut(Pass<'b>, &'a T) -> PassReturn<'b, S>> 
     fn all(
         &mut self,
         state: &mut Self::State,
-        callback: &mut dyn FnMut(&mut dyn for<'b> FnMut(Pass<'b>) -> PassReturn<'b, ()>, bool),
+        callback: &mut dyn FnMut(
+            &mut dyn for<'b> FnMut(Pass<'b>) -> PassReturn<'b, DummyWidgetState>,
+            Focus,
+        ),
     ) {
         for (i, item) in self.slice.iter().enumerate() {
-            if state.len() <= i {
-                state.push(init(&mut |p| (self.widget)(p, item)));
+            if state.inner_states.len() <= i {
+                state
+                    .inner_states
+                    .push(init(&mut |p| (self.widget)(p, item)));
             }
 
-            let state = &mut state[i];
+            let widget_state = &mut state.inner_states[i];
 
             callback(
                 &mut |pass| {
                     pass.apply(
-                        (&mut self.widget, &mut *state),
-                        |_| (),
+                        (&mut self.widget, &mut *widget_state),
+                        |_| DummyWidgetState,
                         |(widget, state), _, focus, area, buffer| {
                             draw(&mut |p| widget(p, item), state, focus, area, buffer)
                         },
-                        |(widget, state), _| focusable(&mut |p| widget(p, item), state),
                         |(widget, state), _, event| {
                             handle_key_event(&mut |p| widget(p, item), state, event)
                         },
                     )
                 },
-                false,
+                if state.focus == i {
+                    Focus::Focused
+                } else {
+                    Focus::Unfocused
+                },
             );
         }
 
-        state.truncate(self.slice.len());
+        state.inner_states.truncate(self.slice.len());
     }
 }
 
@@ -153,18 +200,41 @@ pub fn slice<'a, T, S: 'static, W: for<'b> FnMut(Pass<'b>, &'a T) -> PassReturn<
     }
 }
 
+pub struct TupleListContentState<C> {
+    content: C,
+    focus: usize,
+}
+
 macro_rules! impl_for_tuples {
     ($($type:ident: $field:tt),*) => {
+        impl<$($type: ListContentState),*> ListContentState for TupleListContentState<($($type,)*)> {
+            fn reset_focus(&mut self) -> Focusable {
+                $(
+                    if (self.content.$field.reset_focus() == Focusable::Yes) {
+                        self.focus = $field;
+
+                        return Focusable::Yes;
+                    }
+                )*
+
+                Focusable::No
+            }
+        }
+
+
         impl<$($type: ListContent),*> ListContent for ($($type,)*) {
-            type State = ($($type::State,)*);
+            type State = TupleListContentState<($($type::State,)*)>;
 
             #[allow(unused_variables)]
             fn init(
                 &mut self,
             ) -> Self::State {
-                ($(
-                    self.$field.init(),
-                )*)
+                TupleListContentState {
+                    content: ($(
+                        self.$field.init(),
+                    )*),
+                    focus: 0,
+                }
             }
 
             fn next_constraint(&mut self) -> Option<Constraint> {
@@ -180,10 +250,19 @@ macro_rules! impl_for_tuples {
             fn all(
                 &mut self,
                 state: &mut Self::State,
-                callback: &mut dyn FnMut(&mut dyn for<'a> FnMut(Pass<'a>) -> PassReturn<'a, ()>, bool),
+                callback: &mut dyn FnMut(&mut dyn for<'a> FnMut(Pass<'a>) -> PassReturn<'a, DummyWidgetState>, Focus),
             ) {
                 $(
-                    self.$field.all(&mut state.$field, callback);
+                    self.$field.all(&mut state.content.$field, &mut |widget, focus| {
+                        callback(
+                            widget,
+                            if state.focus == $field {
+                                focus
+                            } else {
+                                Focus::Unfocused
+                            },
+                        );
+                    });
                 )*
             }
         }

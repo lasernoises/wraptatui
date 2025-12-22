@@ -1,10 +1,16 @@
 use crossterm::event::KeyEvent;
 
-use crate::{Pass, PassReturn, draw, handle_key_event, init};
+use crate::{Focusable, Pass, PassReturn, WidgetState, draw, handle_key_event, init};
 
 pub struct State<S>(S);
 
-pub fn with_key_handler<'a, S: 'static, T>(
+impl<S: WidgetState> WidgetState for State<S> {
+    fn reset_focus(&mut self) -> Focusable {
+        Focusable::Yes
+    }
+}
+
+pub fn with_key_handler<'a, S: WidgetState, T>(
     pass: Pass<'a>,
     shared: &mut T,
     handler: impl FnMut(&mut T, KeyEvent) -> bool,
@@ -16,7 +22,6 @@ pub fn with_key_handler<'a, S: 'static, T>(
         |(shared, _, mut content), State(state), focus, area, buffer| {
             draw(&mut |p| content(p, shared), state, focus, area, buffer)
         },
-        |_, _| true,
         |(shared, mut handler, mut content), State(state), event| {
             handle_key_event(&mut |p| content(p, shared), state, event) || handler(shared, event)
         },

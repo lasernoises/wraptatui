@@ -1,29 +1,46 @@
-use crate::{Pass, PassReturn, draw, focusable, handle_key_event, init};
+use crate::{Focusable, Pass, PassReturn, WidgetState, draw, handle_key_event, init};
 
-pub fn state<'a, S: 'static, T: Default + 'static>(
+pub struct State<S, T> {
+    widget_state: S,
+    state: T,
+}
+
+impl<S: WidgetState, T: 'static> WidgetState for State<S, T> {
+    fn reset_focus(&mut self) -> Focusable {
+        self.widget_state.reset_focus()
+    }
+}
+
+pub fn state<'a, S: WidgetState, T: Default + 'static>(
     pass: Pass<'a>,
-    content: &mut dyn for<'b> FnMut(Pass<'b>, &mut T) -> PassReturn<'b, S>,
-) -> PassReturn<'a, impl Sized + 'static + use<S, T>> {
+    content: impl for<'b> FnMut(Pass<'b>, &mut T) -> PassReturn<'b, S>,
+) -> PassReturn<'a, State<S, T>> {
     pass.apply(
         content,
-        |content| {
+        |mut content| {
             let mut state: T = Default::default();
 
             let widget_state = init(&mut |pass| content(pass, &mut state));
-            (state, widget_state)
-        },
-        |content, (state, widget_state), focus, area, buffer| {
-            draw(
-                &mut |pass| content(pass, state),
+            State {
                 widget_state,
+                state,
+            }
+        },
+        |mut content, state, focus, area, buffer| {
+            draw(
+                &mut |pass| content(pass, &mut state.state),
+                &mut state.widget_state,
                 focus,
                 area,
                 buffer,
             )
         },
-        |content, (state, widget_state)| focusable(&mut |pass| content(pass, state), widget_state),
-        |content, (state, widget_state), event| {
-            handle_key_event(&mut |pass| content(pass, state), widget_state, event)
+        |mut content, state, event| {
+            handle_key_event(
+                &mut |pass| content(pass, &mut state.state),
+                &mut state.widget_state,
+                event,
+            )
         },
     )
 }

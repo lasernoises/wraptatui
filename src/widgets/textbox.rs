@@ -4,18 +4,23 @@ use ratatui::{
 };
 use tui_input::backend::crossterm::EventHandler;
 
-use crate::{Pass, PassReturn};
+use crate::{Focusable, Pass, PassReturn, WidgetState};
 
 pub use tui_input::Input;
 
-pub fn textbox<'a>(
-    pass: Pass<'a>,
-    input: &mut Input,
-) -> PassReturn<'a, impl Sized + use<> + 'static> {
+pub struct State;
+
+impl WidgetState for State {
+    fn reset_focus(&mut self) -> Focusable {
+        Focusable::Yes
+    }
+}
+
+pub fn textbox<'a>(pass: Pass<'a>, input: &mut Input) -> PassReturn<'a, State> {
     pass.apply(
         input,
-        |_| (),
-        |input, _, _focus, area, buffer| {
+        |_| State,
+        |input, _, _, area, buffer| {
             let width = area.width;
             let scroll = input.visual_scroll(width as usize);
 
@@ -25,7 +30,6 @@ pub fn textbox<'a>(
 
             Some(Position::new(area.x + x as u16, area.y))
         },
-        |_, _| true,
         |input, _, event| {
             input
                 .handle_event(&crossterm::event::Event::Key(event))

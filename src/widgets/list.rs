@@ -1,18 +1,32 @@
 use ratatui::layout::{Direction, Layout};
 
 use crate::{
-    Pass, PassReturn, draw, focusable, handle_key_event,
-    list_content::{ConstraintsIter, ListContent},
+    Focus, Focusable, Pass, PassReturn, WidgetState, draw, handle_key_event,
+    list_content::{ConstraintsIter, DummyWidgetState, ListContent, ListContentState},
 };
 
-pub fn list<'a, S: 'static>(
+pub struct State<S> {
+    list_content_state: S,
+}
+
+impl<S: ListContentState> WidgetState for State<S> {
+    fn reset_focus(&mut self) -> Focusable {
+        self.list_content_state.reset_focus()
+    }
+}
+
+pub fn list<'a, S: ListContentState>(
     pass: Pass<'a>,
     direction: Direction,
     content: &mut dyn ListContent<State = S>,
-) -> PassReturn<'a, impl Sized + 'static + use<S>> {
+) -> PassReturn<'a, State<S>> {
     pass.apply(
         content,
-        |content| content.init(),
+        |content| {
+            let mut list_content_state = content.init();
+            list_content_state.reset_focus();
+            State { list_content_state }
+        },
         |content, state, focus, area, buffer| {
             let layout = Layout::new(direction, ConstraintsIter(content));
             let areas = layout.split(area);
@@ -20,11 +34,11 @@ pub fn list<'a, S: 'static>(
 
             let mut position = None;
 
-            content.all(state, &mut |widget, focused| {
+            content.all(&mut state.list_content_state, &mut |widget, _| {
                 let area = *areas.next().unwrap();
 
-                if let Some(widget_position) = draw(widget, &mut (), focus, area, buffer)
-                    && focused
+                if let Some(widget_position) =
+                    draw(widget, &mut DummyWidgetState, focus, area, buffer)
                 {
                     position = Some(widget_position);
                 }
@@ -32,26 +46,12 @@ pub fn list<'a, S: 'static>(
 
             position
         },
-        |content, state| {
-            let mut result = false;
-
-            content.all(state, &mut |widget, focused| {
-                // TODO: Add short circuiting in list content.
-                if result {
-                    return;
-                }
-
-                result = focusable(widget, &mut ());
-            });
-
-            result
-        },
         |content, state, event| {
             let mut handled = false;
 
-            content.all(state, &mut |widget, focused| {
-                if focused {
-                    handled = handle_key_event(widget, &mut (), event);
+            content.all(&mut state.list_content_state, &mut |widget, focus| {
+                if focus == Focus::Focused {
+                    handled = handle_key_event(widget, &mut DummyWidgetState, event);
                 }
             });
 
@@ -60,16 +60,16 @@ pub fn list<'a, S: 'static>(
     )
 }
 
-pub fn hlist<'a, S: 'static>(
+pub fn hlist<'a, S: ListContentState>(
     pass: Pass<'a>,
     content: &mut dyn ListContent<State = S>,
-) -> PassReturn<'a, impl Sized + 'static + use<S>> {
+) -> PassReturn<'a, State<S>> {
     list(pass, Direction::Horizontal, content)
 }
 
-pub fn vlist<'a, S: 'static>(
+pub fn vlist<'a, S: ListContentState>(
     pass: Pass<'a>,
     content: &mut dyn ListContent<State = S>,
-) -> PassReturn<'a, impl Sized + 'static + use<S>> {
+) -> PassReturn<'a, State<S>> {
     list(pass, Direction::Vertical, content)
 }
