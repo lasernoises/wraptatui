@@ -13,7 +13,7 @@ pub fn list<'a, S: 'static>(
     pass.apply(
         content,
         |content| content.init(),
-        |content, state, area, buffer| {
+        |content, state, focus, area, buffer| {
             let layout = Layout::new(direction, ConstraintsIter(content));
             let areas = layout.split(area);
             let mut areas = areas.iter();
@@ -23,7 +23,7 @@ pub fn list<'a, S: 'static>(
             content.all(state, &mut |widget, focused| {
                 let area = *areas.next().unwrap();
 
-                if let Some(widget_position) = draw(widget, &mut (), area, buffer)
+                if let Some(widget_position) = draw(widget, &mut (), focus, area, buffer)
                     && focused
                 {
                     position = Some(widget_position);

@@ -6,14 +6,21 @@ use ratatui::{
     layout::{Position, Rect},
 };
 
+#[derive(Copy, Clone, Debug)]
+pub enum Focus {
+    Unfocused,
+    Focused,
+}
+
 enum InnerPass<'a> {
     Init(),
-    Draw(
-        &'a mut dyn Any,
-        Rect,
-        &'a mut Buffer,
-        &'a mut Option<Position>,
-    ),
+    Draw {
+        state: &'a mut dyn Any,
+        focus: Focus,
+        area: Rect,
+        buffer: &'a mut Buffer,
+        position: &'a mut Option<Position>,
+    },
     HandleKeyEvent(&'a mut dyn Any, KeyEvent, &'a mut bool),
 }
 
@@ -31,13 +38,19 @@ impl<'a> Pass<'a> {
         self,
         borrowed: B,
         init: impl Fn(B) -> S,
-        draw: impl Fn(B, &mut S, Rect, &mut Buffer) -> Option<Position>,
+        draw: impl Fn(B, &mut S, Focus, Rect, &mut Buffer) -> Option<Position>,
         handle_key_event: impl Fn(B, &mut S, KeyEvent) -> bool,
     ) -> PassReturn<'a, S> {
         PassReturn(match self.0 {
             InnerPass::Init() => InnerPassReturn::Init(init(borrowed)),
-            InnerPass::Draw(state, area, buffer, position) => {
-                *position = draw(borrowed, state.downcast_mut().unwrap(), area, buffer);
+            InnerPass::Draw {
+                state,
+                focus,
+                area,
+                buffer,
+                position,
+            } => {
+                *position = draw(borrowed, state.downcast_mut().unwrap(), focus, area, buffer);
                 InnerPassReturn::Other(PhantomData)
             }
             InnerPass::HandleKeyEvent(state, event, handled) => {
@@ -58,12 +71,21 @@ pub fn init<S: 'static, W: for<'a> FnMut(Pass<'a>) -> PassReturn<S> + ?Sized>(wi
 pub fn draw<S: 'static, W: for<'a> FnMut(Pass<'a>) -> PassReturn<S> + ?Sized>(
     widget: &mut W,
     state: &mut S,
+    focus: Focus,
     area: Rect,
     buffer: &mut Buffer,
 ) -> Option<Position> {
     let mut position = None;
 
-    match widget(Pass(InnerPass::Draw(state, area, buffer, &mut position))).0 {
+    match widget(Pass(InnerPass::Draw {
+        state,
+        focus,
+        area,
+        buffer,
+        position: &mut position,
+    }))
+    .0
+    {
         InnerPassReturn::Init(_) => unreachable!(),
         InnerPassReturn::Other(_) => position,
     }

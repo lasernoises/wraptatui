@@ -61,7 +61,9 @@ impl<S: 'static, F: for<'a> FnMut(Pass<'a>) -> PassReturn<'a, S>> ListContent fo
                 pass.apply(
                     (&mut self.0, &mut *state),
                     |_| (),
-                    |(widget, state), _, area, buffer| draw(widget, state, area, buffer),
+                    |(widget, state), _, focus, area, buffer| {
+                        draw(widget, state, focus, area, buffer)
+                    },
                     |(widget, state), _, event| handle_key_event(widget, state, event),
                 )
             },
@@ -120,8 +122,8 @@ impl<'a, T, S: 'static, W: for<'b> FnMut(Pass<'b>, &'a T) -> PassReturn<'b, S>> 
                     pass.apply(
                         (&mut self.widget, &mut *state),
                         |_| (),
-                        |(widget, state), _, area, buffer| {
-                            draw(&mut |p| widget(p, item), state, area, buffer)
+                        |(widget, state), _, focus, area, buffer| {
+                            draw(&mut |p| widget(p, item), state, focus, area, buffer)
                         },
                         |(widget, state), _, event| {
                             handle_key_event(&mut |p| widget(p, item), state, event)

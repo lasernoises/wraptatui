@@ -8,6 +8,8 @@ use ratatui::{buffer::Buffer, layout::Rect};
 
 pub use widget::*;
 
+pub use Focus::*;
+
 pub fn run<S: 'static>(widget: &mut impl for<'a> FnMut(Pass<'a>) -> PassReturn<S>) -> Result<()> {
     let mut state = init(widget);
 
@@ -15,7 +17,13 @@ pub fn run<S: 'static>(widget: &mut impl for<'a> FnMut(Pass<'a>) -> PassReturn<S
     let mut terminal = ratatui::init();
     loop {
         terminal.draw(|frame| {
-            let cursor_position = draw(widget, &mut state, frame.area(), frame.buffer_mut());
+            let cursor_position = draw(
+                widget,
+                &mut state,
+                Focused,
+                frame.area(),
+                frame.buffer_mut(),
+            );
 
             if let Some(position) = cursor_position {
                 frame.set_cursor_position(position);
@@ -43,7 +51,7 @@ pub fn ratatui_widget<'a, W: ratatui::widgets::Widget>(
     pass.apply(
         widget,
         |_: W| (),
-        |widget: W, _: &mut (), area: Rect, buffer: &mut Buffer| {
+        |widget: W, _: &mut (), _focus, area: Rect, buffer: &mut Buffer| {
             widget.render(area, buffer);
             None
         },
@@ -59,7 +67,11 @@ pub fn ratatui_stateful_widget<'a, W: ratatui::widgets::StatefulWidget>(
     pass.apply(
         (widget, state),
         |_: (W, &mut W::State)| (),
-        |(widget, state): (W, &mut W::State), _: &mut (), area: Rect, buffer: &mut Buffer| {
+        |(widget, state): (W, &mut W::State),
+         _: &mut (),
+         _focus,
+         area: Rect,
+         buffer: &mut Buffer| {
             widget.render(area, buffer, state);
             None
         },

@@ -15,7 +15,7 @@ pub fn textbox<'a>(
     pass.apply(
         input,
         |_| (),
-        |input, _, area, buffer| {
+        |input, _, _focus, area, buffer| {
             let width = area.width;
             let scroll = input.visual_scroll(width as usize);
 
