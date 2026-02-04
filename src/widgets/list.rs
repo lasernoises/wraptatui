@@ -1,3 +1,4 @@
+use crossterm::event::KeyCode;
 use ratatui::layout::{Direction, Layout};
 
 use crate::{
@@ -55,7 +56,25 @@ pub fn list<'a, S: ListContentState>(
                 }
             });
 
-            handled
+            if !handled {
+                match event.code {
+                    KeyCode::Left | KeyCode::Char('h') if direction == Direction::Horizontal => {
+                        state.list_content_state.move_focus_back()
+                    }
+                    KeyCode::Right | KeyCode::Char('l') if direction == Direction::Horizontal => {
+                        state.list_content_state.move_focus_forward()
+                    }
+                    KeyCode::Up | KeyCode::Char('k') if direction == Direction::Vertical => {
+                        state.list_content_state.move_focus_back()
+                    }
+                    KeyCode::Down | KeyCode::Char('j') if direction == Direction::Vertical => {
+                        state.list_content_state.move_focus_forward()
+                    }
+                    _ => false,
+                }
+            } else {
+                false
+            }
         },
     )
 }

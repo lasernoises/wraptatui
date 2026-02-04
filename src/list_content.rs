@@ -4,6 +4,10 @@ use crate::{Focus, Focusable, Pass, PassReturn, WidgetState, draw, handle_key_ev
 
 pub trait ListContentState: 'static {
     fn reset_focus(&mut self) -> Focusable;
+
+    fn move_focus_back(&mut self) -> bool;
+
+    fn move_focus_forward(&mut self) -> bool;
 }
 
 pub struct DummyWidgetState;
@@ -50,6 +54,14 @@ pub struct SingleWidgetState<S>(S);
 impl<S: WidgetState> ListContentState for SingleWidgetState<S> {
     fn reset_focus(&mut self) -> Focusable {
         self.0.reset_focus()
+    }
+
+    fn move_focus_back(&mut self) -> bool {
+        false
+    }
+
+    fn move_focus_forward(&mut self) -> bool {
+        false
     }
 }
 
@@ -120,6 +132,41 @@ impl<S: WidgetState> ListContentState for SliceListContentState<S> {
         }
 
         return Focusable::No;
+    }
+
+    fn move_focus_back(&mut self) -> bool {
+        for (i, state) in self
+            .inner_states
+            .iter_mut()
+            .enumerate()
+            .take(self.focus)
+            .rev()
+        {
+            if state.reset_focus() == Focusable::Yes {
+                self.focus = i;
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    fn move_focus_forward(&mut self) -> bool {
+        for (i, state) in self
+            .inner_states
+            .iter_mut()
+            .enumerate()
+            .skip(self.focus + 1)
+        {
+            if state.reset_focus() == Focusable::Yes {
+                self.focus = i;
+
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 
@@ -218,6 +265,81 @@ macro_rules! impl_for_tuples {
                 )*
 
                 Focusable::No
+            }
+
+            #[allow(unreachable_code)]
+            fn move_focus_back(&mut self) -> bool {
+                #[allow(unused)]
+                match self.focus {
+                    $($field => {
+                        let state = &mut self.content.$field;
+
+                        if state.move_focus_back() {
+                            return true;
+                        }
+                    },)*
+                    0 => {
+                        // This only applies for the empty tuple case, as otherwise the 0
+                        // pattern is covered above.
+                        return false;
+                    },
+                    _ => unreachable!()
+                }
+
+                for i in (0..self.focus).rev() {
+                    match i {
+                        $($field => {
+                            let state = &mut self.content.$field;
+
+                            if state.reset_focus() == Focusable::Yes {
+                                self.focus = $field;
+                                return true;
+                            }
+                        },)*
+                        _ => unreachable!()
+                    }
+
+                }
+
+                return false;
+            }
+
+            #[allow(unreachable_code)]
+            fn move_focus_forward(&mut self) -> bool {
+                #[allow(unused)]
+                match self.focus {
+                    $($field => {
+                        let state = &mut self.content.$field;
+
+                        if state.move_focus_forward() {
+                            return true;
+                        }
+                    },)*
+                    0 => {
+                        // This only applies for the empty tuple case, as otherwise the 0
+                        // pattern is covered above.
+                        return false;
+                    },
+                    _ => unreachable!()
+                }
+
+                for i in (self.focus + 1).. {
+                    match i {
+                        $($field => {
+                            let state = &mut self.content.$field;
+
+                            if state.reset_focus() == Focusable::Yes {
+                                self.focus = $field;
+                                return true;
+                            }
+                        },)*
+                        // We use this to terminate the loop because we don't have an easy way to
+                        // get the length of our tuple for the range.
+                        _ => break
+                    }
+                }
+
+                return false;
             }
         }
 
