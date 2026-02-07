@@ -1,7 +1,6 @@
 use crossterm::event::KeyCode;
 use ratatui::layout::Constraint;
 use wraptatui::{
-    Focusable,
     list_content::{fill, slice},
     ratatui_widget, run,
     widgets::{list::vlist, state::state, with_key_handler::with_key_handler},
@@ -14,10 +13,8 @@ fn main() {
         vlist(
             p,
             &mut (
-                fill(1, |p| ratatui_widget(p, Focusable::No, "Hello, World!")),
-                slice(Constraint::Length(1), &list, |p, x| {
-                    ratatui_widget(p, Focusable::No, *x)
-                }),
+                fill(1, |p| ratatui_widget(p, "Hello, World!")),
+                slice(Constraint::Length(1), &list, |p, x| ratatui_widget(p, *x)),
                 fill(2, |p| {
                     state(p, |p, count: &mut i32| {
                         with_key_handler(
@@ -34,7 +31,7 @@ fn main() {
                                 }
                                 _ => false,
                             },
-                            |p, count| ratatui_widget(p, Focusable::No, count.to_string()),
+                            |p, count| ratatui_widget(p, count.to_string()),
                         )
                     })
                 }),

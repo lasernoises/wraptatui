@@ -44,22 +44,21 @@ pub fn run<S: 'static>(widget: &mut impl for<'a> FnMut(Pass<'a>) -> PassReturn<S
     Ok(())
 }
 
-pub struct RatatuiWidgetState(Focusable);
+pub struct RatatuiWidgetState;
 
 impl WidgetState for RatatuiWidgetState {
     fn reset_focus(&mut self) -> Focusable {
-        self.0
+        Focusable::No
     }
 }
 
 pub fn ratatui_widget<'a, W: ratatui::widgets::Widget>(
     pass: Pass<'a>,
-    focusable: Focusable,
     widget: W,
 ) -> PassReturn<'a, RatatuiWidgetState> {
     pass.apply(
         widget,
-        |_: W| RatatuiWidgetState(focusable),
+        |_: W| RatatuiWidgetState,
         |widget: W, _, _, area: Rect, buffer: &mut Buffer| {
             widget.render(area, buffer);
             None
@@ -70,13 +69,12 @@ pub fn ratatui_widget<'a, W: ratatui::widgets::Widget>(
 
 pub fn ratatui_stateful_widget<'a, W: ratatui::widgets::StatefulWidget>(
     pass: Pass<'a>,
-    focusable: Focusable,
     state: &mut W::State,
     widget: W,
 ) -> PassReturn<'a, RatatuiWidgetState> {
     pass.apply(
         (widget, state),
-        |_: (W, &mut W::State)| RatatuiWidgetState(focusable),
+        |_: (W, &mut W::State)| RatatuiWidgetState,
         |(widget, state): (W, &mut W::State), _, _, area: Rect, buffer: &mut Buffer| {
             widget.render(area, buffer, state);
             None
