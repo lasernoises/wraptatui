@@ -5,5 +5,13 @@ use wraptatui::{
 };
 
 fn main() {
-    run(&mut |p| state(p, |p, input: &mut Input| textbox(p, input))).unwrap();
+    run(&mut |p| {
+        state(
+            p,
+            &mut (),
+            |_| Input::default(),
+            |p, _, input: &mut Input| textbox(p, input),
+        )
+    })
+    .unwrap();
 }
